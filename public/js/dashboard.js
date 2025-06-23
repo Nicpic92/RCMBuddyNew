@@ -1,13 +1,12 @@
 // public/js/dashboard.js
 
-// This function will be called after a successful user verification
+// This function will be called after a successful user verification (from auth.js)
 async function initDashboard(user) {
-    console.log("Initializing dashboard for user:", user);
+    console.log("Dashboard Initialization: Starting for user:", user);
 
-    // Update profile link/name
+    // Update profile link/name display
     const profileLink = document.getElementById('profileLink');
     if (profileLink) {
-        // Assuming 'user' object has 'username' and 'company_name'
         profileLink.textContent = `Hello, ${user.username || 'User'}!`;
     }
 
@@ -20,52 +19,63 @@ async function initDashboard(user) {
     // Setup Logout Button
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
-        logoutBtn.addEventListener('click', handleLogout); // This now correctly calls handleLogout
+        logoutBtn.addEventListener('click', handleLogout);
+        console.log("Dashboard Initialization: Logout button event listener attached.");
+    } else {
+        console.warn("Dashboard Initialization: Logout button not found (ID: logoutBtn).");
     }
 
     // Fetch and display authorized tools
-    // Make sure user.company_id actually contains a value here (check console log above)
     if (user.companyId) {
+        console.log("Dashboard Initialization: Attempting to display authorized tools for companyId:", user.companyId);
         await displayAuthorizedTools(user.companyId);
     } else {
-        console.warn("User has no companyId. Cannot fetch authorized tools.");
-        // Optionally hide all tools if companyId is missing
+        console.warn("Dashboard Initialization: User has no companyId. Cannot fetch authorized tools.");
+        // Hide all tools if companyId is missing or invalid
         document.querySelectorAll('.tool-card[data-tool-identifier]').forEach(card => card.classList.add('hidden'));
     }
+    console.log("Dashboard Initialization: Completed.");
 }
 
+/**
+ * Fetches authorized tools from the backend and displays them on the dashboard.
+ * @param {string} companyId - The ID of the company to fetch tools for.
+ */
 async function displayAuthorizedTools(companyId) {
     const toolCards = document.querySelectorAll('.tool-card[data-tool-identifier]');
-    console.log("Starting displayAuthorizedTools for companyId:", companyId);
-    console.log("Initial tool cards found:", toolCards.length);
+    console.log("Display Tools: Starting. Found", toolCards.length, "initial tool cards.");
 
     try {
-        const token = localStorage.getItem('token'); // Ensure token is retrieved from localStorage
+        const token = localStorage.getItem('token');
+        if (!token) {
+            console.error("Display Tools: No authentication token found. Redirecting to login.");
+            alert("Session expired or no token. Please log in again.");
+            window.location.href = '/index.html'; // Redirect to index/login
+            return;
+        }
 
-        // --- IMPORTANT: Replace this with your actual API endpoint for tools ---
-        // This endpoint should return an array of strings, e.g., ['file-manager', 'data-cleaner']
+        console.log("Display Tools: Fetching from API: /api/get-company-tools?companyId=" + companyId);
         const response = await fetch(`/api/get-company-tools?companyId=${companyId}`, {
              method: 'GET',
              headers: {
                  'Content-Type': 'application/json',
-                 // Include authorization token if your API requires it
-                 'Authorization': `Bearer ${token}` // Make sure this is correctly passed
+                 'Authorization': `Bearer ${token}` // Ensure token is passed
              }
         });
 
-        console.log("API Response Status:", response.status);
+        console.log("Display Tools: API Response Status:", response.status);
 
         if (!response.ok) {
-            const errorText = await response.text(); // Get more detailed error message
-            console.error("API Error Response Text:", errorText);
-            throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+            const errorText = await response.text();
+            console.error("Display Tools: API HTTP Error:", response.status, errorText);
+            throw new Error(`HTTP error! Status: ${response.status} - ${errorText}`);
         }
 
         const authorizedTools = await response.json();
-        console.log("Authorized tools received from API:", authorizedTools); // Crucial log
+        console.log("Display Tools: Authorized tools received from API:", authorizedTools);
 
         if (!Array.isArray(authorizedTools)) {
-            console.error("API response is not an array:", authorizedTools);
+            console.error("Display Tools: API response is not an array:", authorizedTools);
             throw new Error("Invalid format for authorized tools from API. Expected an array.");
         }
 
@@ -75,30 +85,33 @@ async function displayAuthorizedTools(companyId) {
             if (authorizedTools.includes(toolIdentifier)) {
                 card.classList.remove('hidden'); // Show the tool card
                 toolsDisplayedCount++;
-                console.log(`Showing tool: ${toolIdentifier}`);
+                console.log(`Display Tools: Showing tool: ${toolIdentifier}`);
             } else {
                 card.classList.add('hidden'); // Ensure it's hidden if not authorized
-                console.log(`Hiding tool: ${toolIdentifier}`);
+                console.log(`Display Tools: Hiding tool: ${toolIdentifier}`);
             }
         });
-        console.log(`Finished displaying tools. Total shown: ${toolsDisplayedCount}`);
+        console.log(`Display Tools: Finished displaying tools. Total shown: ${toolsDisplayedCount}`);
 
     } catch (error) {
-        console.error("Error fetching or displaying authorized tools:", error);
+        console.error("Display Tools: Error fetching or displaying authorized tools:", error);
         // Hide all tools in case of an error to avoid showing unauthorized content
         toolCards.forEach(card => card.classList.add('hidden'));
-        alert("Failed to load tools. Please check console for details."); // This is the alert you're seeing
+        alert("Failed to load tools. Please check console for details.");
     }
 }
 
-// --- DEFINE handleLogout HERE to fix ReferenceError ---
+/**
+ * Handles user logout: clears token and redirects to the landing page.
+ */
 function handleLogout() {
-    console.log("Logging out...");
+    console.log("Logout: Initiated.");
     localStorage.removeItem('token'); // Remove the JWT token
-    // You might also want to clear any other user-related local storage items
-    window.location.href = '/login.html'; // Redirect to your login page
+    // Clear any other user-related local storage items if applicable
+    console.log("Logout: Token removed. Redirecting to /index.html");
+    window.location.href = '/index.html'; // Redirect to your main landing/login page
 }
 
-// Note: The verifyAndSetupUser function is assumed to be in auth.js.
-// It should be made globally accessible by auth.js (e.g., window.verifyAndSetupUser = verifyAndSetupUser;)
-// or your build process should handle module imports correctly.
+// Note: The verifyAndSetupUser function is assumed to be defined and made globally accessible
+// by auth.js. It should handle initial authentication check and redirection if no token.
+// Example in auth.js: window.verifyAndSetupUser = verifyAndSetupUser;
