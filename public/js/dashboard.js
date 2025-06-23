@@ -33,18 +33,18 @@ async function initDashboard(user) {
 
 async function displayAuthorizedTools(companyId) {
     const toolCards = document.querySelectorAll('.tool-card[data-tool-identifier]');
-    console.log("Display Tools: Starting. Found", toolCards.length, "initial tool cards.");
+    console.log("Display Tools (Dashboard): Starting. Found", toolCards.length, "initial tool cards.");
 
     try {
         const token = localStorage.getItem('token');
         if (!token) {
-            console.error("Display Tools: No authentication token found. Redirecting to login.");
+            console.error("Display Tools (Dashboard): No authentication token found. Redirecting to login.");
             alert("Session expired or no token. Please log in again.");
             window.location.href = '/index.html';
             return;
         }
 
-        console.log("Display Tools: Fetching from API: /api/get-company-tools?companyId=" + companyId);
+        console.log("Display Tools (Dashboard): Fetching from API: /api/get-company-tools?companyId=" + companyId);
         const response = await fetch(`/api/get-company-tools?companyId=${companyId}`, {
              method: 'GET',
              headers: {
@@ -53,19 +53,19 @@ async function displayAuthorizedTools(companyId) {
              }
         });
 
-        console.log("Display Tools: API Response Status:", response.status);
+        console.log("Display Tools (Dashboard): API Response Status:", response.status);
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error("Display Tools: API HTTP Error:", response.status, errorText);
+            console.error("Display Tools (Dashboard): API HTTP Error:", response.status, errorText);
             throw new Error(`HTTP error! Status: ${response.status} - ${errorText}`);
         }
 
         const authorizedTools = await response.json();
-        console.log("Display Tools: Authorized tools received from API:", authorizedTools);
+        console.log("Display Tools (Dashboard): Authorized tools received from API:", authorizedTools);
 
         if (!Array.isArray(authorizedTools)) {
-            console.error("Display Tools: API response is not an array:", authorizedTools);
+            console.error("Display Tools (Dashboard): API response is not an array:", authorizedTools);
             throw new Error("Invalid format for authorized tools from API. Expected an array.");
         }
 
@@ -75,23 +75,23 @@ async function displayAuthorizedTools(companyId) {
             if (authorizedTools.includes(toolIdentifier)) {
                 card.classList.remove('hidden');
                 toolsDisplayedCount++;
-                console.log(`Display Tools: Showing tool: ${toolIdentifier}`);
+                console.log(`Display Tools (Dashboard): Showing tool: ${toolIdentifier}`);
             } else {
                 card.classList.add('hidden');
-                console.log(`Display Tools: Hiding tool: ${toolIdentifier}`);
+                console.log(`Display Tools (Dashboard): Hiding tool: ${toolIdentifier}`);
             }
         });
-        console.log(`Display Tools: Finished displaying tools. Total shown: ${toolsDisplayedCount}`);
+        console.log(`Display Tools (Dashboard): Finished displaying tools. Total shown: ${toolsDisplayedCount}`);
 
     } catch (error) {
-        console.error("Display Tools: Error fetching or displaying authorized tools:", error);
+        console.error("Display Tools (Dashboard): Error fetching or displaying authorized tools:", error);
         toolCards.forEach(card => card.classList.add('hidden'));
         alert("Failed to load tools. Please check console for details.");
     }
 }
 
 function handleLogout() {
-    console.log("Logout: Initiated.");
+    console.log("Logout: Initiated from Dashboard.");
     localStorage.removeItem('token');
     console.log("Logout: Token removed. Redirecting to /index.html");
     window.location.href = '/index.html';
