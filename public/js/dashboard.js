@@ -1,96 +1,107 @@
-// public/js/dashboard.js
+// js/dashboard.js
 
-// This function will be called from the <body> onload after verifyAndSetupUser has run
+// This function will be called after a successful user verification
 async function initDashboard(user) {
-    // These elements are in dashboard.html itself
-    const dashboardHeading = document.getElementById('dashboard-heading');
+    console.log("Initializing dashboard for user:", user);
+
+    // Update profile link/name
+    const profileLink = document.getElementById('profileLink');
+    if (profileLink) {
+        // Assuming 'user' object has 'username' and 'company_name'
+        profileLink.textContent = `Hello, ${user.username || 'User'}!`;
+    }
+
+    // Update company display
     const companyDisplay = document.getElementById('company-display');
-    const navList = document.getElementById('nav-list');
-    
-    // Check if user object is available (passed from verifyAndSetupUser)
-    if (!user) {
-        // This case should ideally be handled by verifyAndSetupUser redirecting to login
-        // but as a fallback, ensure UI indicates loading failure.
-        dashboardHeading.textContent = 'Welcome!';
-        companyDisplay.textContent = 'Please log in.';
-        return;
+    if (companyDisplay && user.company_name) {
+        companyDisplay.textContent = `Company: ${user.company_name}`;
     }
 
-    // Update UI with user information
-    // dashboardHeading text already updated with username via auth.js
-    companyDisplay.textContent = `Company: ${user.company_name}`;
-
-    // Dynamically add the "Admin Console" link if the user is an admin or superadmin
-    if (user.role === 'admin' || user.role === 'superadmin') {
-        const adminLinkLi = document.createElement('li');
-        adminLinkLi.innerHTML = `<a href="/admin.html" class="text-blue-600 font-bold hover:underline">Admin Console</a>`;
-        
-        // Insert the admin link before the profile/logout elements for a nice layout
-        const profileLinkLi = document.getElementById('profileLink').closest('li'); // Get the <li> containing the profile link
-        if (profileLinkLi) {
-            navList.insertBefore(adminLinkLi, profileLinkLi);
-        } else {
-            navList.appendChild(adminLinkLi); // Fallback if profileLinkLi not found
-        }
+    // Setup Logout Button
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', handleLogout);
     }
 
-    // --- Enforce Permissions: Show/Hide Tool Cards ---
-    // Fetch accessible tools from the backend
+    // Fetch and display authorized tools
+    await displayAuthorizedTools(user.company_id); // Assuming user object contains company_id
+}
+
+async function displayAuthorizedTools(companyId) {
+    const toolCards = document.querySelectorAll('.tool-card[data-tool-identifier]');
+
     try {
-        const token = localStorage.getItem('jwtToken');
-        if (!token) throw new Error('JWT token missing for tool access check.');
-
-        // Calling a new backend function to get the list of tools assigned to this user's company
-        // You will need to implement this new backend function `get-accessible-tools.js`
-        // in `netlify/functions/user-auth/` or similar.
-        const response = await fetch('/.netlify/functions/get-accessible-tools', {
-            method: 'GET',
-            headers: { 'Authorization': `Bearer ${token}` }
+        // --- IMPORTANT: Replace this with your actual API endpoint for tools ---
+        // This endpoint should return an array of strings, e.g., ['file-manager', 'data-cleaner']
+        const response = await fetch(`/api/get-company-tools?companyId=${companyId}`, {
+             method: 'GET',
+             headers: {
+                 'Content-Type': 'application/json',
+                 // Include authorization token if your API requires it
+                 'Authorization': `Bearer ${localStorage.getItem('token')}`
+             }
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Failed to fetch accessible tools:', response.status, errorData.message);
-            // Decide how to handle this error - maybe show all tools but make them inactive
-            // or alert the user. For now, we'll proceed with an empty list of accessible tools.
-            showDashboardMessage('Failed to load your assigned tools. Displaying all tools.', 'error');
-            const allToolCards = document.querySelectorAll('[data-tool-identifier]');
-            allToolCards.forEach(card => card.style.display = 'block'); // Show all if fetch fails
-            return;
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data = await response.json();
-        const accessibleToolIdentifiers = data.tools || []; // Expecting an array of identifiers
+        const authorizedTools = await response.json(); // Expects an array of tool identifiers
 
-        const allToolCards = document.querySelectorAll('[data-tool-identifier]');
+        console.log("Authorized tools:", authorizedTools);
 
-        allToolCards.forEach(card => {
-            const toolIdentifier = card.dataset.toolIdentifier;
-            if (accessibleToolIdentifiers.includes(toolIdentifier)) {
-                card.style.display = 'block'; // Show the card if tool is accessible
+        toolCards.forEach(card => {
+            const toolIdentifier = card.getAttribute('data-tool-identifier');
+            if (authorizedTools.includes(toolIdentifier)) {
+                card.classList.remove('hidden'); // Show the tool card
             } else {
-                card.style.display = 'none'; // Hide the card if not accessible
+                card.classList.add('hidden'); // Ensure it's hidden if not authorized (redundant if all start hidden)
             }
         });
 
     } catch (error) {
-        console.error('Error in initDashboard while checking tool permissions:', error);
-        // Fallback: If any error, show all tool cards by default or alert the user
-        const allToolCards = document.querySelectorAll('[data-tool-identifier]');
-        allToolCards.forEach(card => card.style.display = 'block');
-        showDashboardMessage('An error occurred loading tool permissions. Displaying all tools.','error');
+        console.error("Error fetching authorized tools:", error);
+        // Optionally, display an error message to the user
+        // alert("Failed to load tools. Please try again later.");
+        // As a fallback, you might hide all tools or show a generic message
+        toolCards.forEach(card => card.classList.add('hidden'));
     }
 }
 
-// Helper for dashboard-specific messages
-function showDashboardMessage(msg, type) {
-    const dashboardMessageDiv = document.getElementById('dashboard-message-area'); // Need to add this div in HTML
-    if (dashboardMessageDiv) {
-        dashboardMessageDiv.className = `p-3 rounded-lg text-sm text-center ${type === 'error' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`;
-        dashboardMessageDiv.textContent = msg;
-        dashboardMessageDiv.style.display = 'block';
+// Assuming auth.js provides verifyAndSetupUser and handleLogout
+// If not, you'll need to define verifyAndSetupUser and handleLogout here
+/*
+async function verifyAndSetupUser() {
+    // Implement your token verification and user data fetching here
+    // Example (replace with your actual auth logic):
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = '/login.html'; // Redirect to login if no token
+        return null;
+    }
+    try {
+        const response = await fetch('/.netlify/functions/verify-token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        if (!response.ok) {
+            throw new Error('Token verification failed');
+        }
+        const userData = await response.json();
+        return userData.user; // Assuming your verify-token function returns { user: { id, username, company_name, company_id, ... }}
+    } catch (error) {
+        console.error("Authentication failed:", error);
+        localStorage.removeItem('token');
+        window.location.href = '/login.html';
+        return null;
     }
 }
 
-// Add a div for dashboard messages (if not already in HTML)
-// <div id="dashboard-message-area" style="display:none;" class="mb-4"></div>
+function handleLogout() {
+    localStorage.removeItem('token');
+    window.location.href = '/login.html';
+}
+*/
