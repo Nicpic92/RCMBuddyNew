@@ -1,0 +1,15 @@
+[build]
+  publish = "public"
+  # This command installs dependencies for the root project (if any),
+  # and then for the single consolidated functions package.json.
+  command = "npm install && cd netlify/functions && npm install && cd ../../"
+
+# --- Netlify Functions Configuration ---
+# This directory setting remains the same, pointing to the root of your functions.
+[functions]
+  directory = "netlify/functions"
+
+# --- Netlify Plugins Configuration ---
+# This section remains the same.
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
