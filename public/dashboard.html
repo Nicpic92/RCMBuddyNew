@@ -10,11 +10,11 @@
         body {
             background-color: #f4f7f6;
         }
-        /* Tool card display styles for toggling visibility */
-        .tool-card[data-tool-identifier] {
-            /* Initially hidden or controlled by JS */
-            display: none;
-        }
+        /*
+         * No need for specific `display: none;` here for tool-card.
+         * We'll rely on Tailwind's 'hidden' class or a JS-toggled class.
+         * The JS will add/remove 'hidden' or show/hide based on user tools.
+         */
     </style>
     <script src="/js/auth.js"></script>
     <script src="/js/dashboard.js"></script>
@@ -27,7 +27,9 @@
             <ul id="nav-list" class="flex items-center space-x-4">
                 <li><a href="/dashboard.html" class="text-gray-600 hover:text-blue-500 font-medium">Dashboard</a></li>
                 <li><a href="/tools.html" class="text-gray-600 hover:text-blue-500 font-medium">All Tools</a></li>
-                <li><span id="profileLink" class="text-gray-700 font-semibold">Loading...</span></li> <li><button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors">Logout</button></li> </ul>
+                <li><span id="profileLink" class="text-gray-700 font-semibold">Loading...</span></li>
+                <li><button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors">Logout</button></li>
+            </ul>
         </div>
     </nav>
 
@@ -37,9 +39,8 @@
             <p id="company-display" class="text-xl text-gray-600">Loading company info...</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            
-            <div class="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300" data-tool-identifier="file-manager">
+        <div id="tool-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div class="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 hidden" data-tool-identifier="file-manager">
                 <div class="flex items-center mb-4">
                     <i class="fas fa-folder-open text-3xl text-blue-500 mr-4"></i>
                     <h3 class="text-xl font-semibold text-gray-800">File Manager</h3>
@@ -48,7 +49,7 @@
                 <a href="/file-manager.html" class="font-semibold text-blue-600 hover:underline">Go to File Manager →</a>
             </div>
 
-            <div class="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300" data-tool-identifier="data-dictionary-builder">
+            <div class="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 hidden" data-tool-identifier="data-dictionary-builder">
                 <div class="flex items-center mb-4">
                     <i class="fas fa-book text-3xl text-purple-500 mr-4"></i>
                     <h3 class="text-xl font-semibold text-gray-800">Data Dictionary Builder</h3>
@@ -57,7 +58,7 @@
                 <a href="/tools/data-dictionary-builder.html" class="font-semibold text-blue-600 hover:underline">Build Dictionaries →</a>
             </div>
 
-            <div class="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300" data-tool-identifier="validation-engine">
+            <div class="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 hidden" data-tool-identifier="validation-engine">
                 <div class="flex items-center mb-4">
                     <i class="fas fa-check-double text-3xl text-green-500 mr-4"></i>
                     <h3 class="text-xl font-semibold text-gray-800">Validation Engine</h3>
@@ -66,7 +67,7 @@
                 <a href="/tools/validation-engine.html" class="font-semibold text-blue-600 hover:underline">Validate Data →</a>
             </div>
 
-            <div class="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300" data-tool-identifier="data-cleaner">
+            <div class="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 hidden" data-tool-identifier="data-cleaner">
                 <div class="flex items-center mb-4">
                     <i class="fas fa-broom text-3xl text-yellow-500 mr-4"></i>
                     <h3 class="text-xl font-semibold text-gray-800">Data Cleaner</h3>
@@ -75,7 +76,7 @@
                 <a href="/tools/data-cleaner.html" class="font-semibold text-blue-600 hover:underline">Use Tool →</a>
             </div>
 
-            <div class="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300" data-tool-identifier="lag-report-dashboard">
+            <div class="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 hidden" data-tool-identifier="lag-report-dashboard">
                 <div class="flex items-center mb-4">
                     <i class="fas fa-chart-line text-3xl text-red-500 mr-4"></i>
                     <h3 class="text-xl font-semibold text-gray-800">Lag Report Dashboard</h3>
@@ -84,7 +85,7 @@
                 <a href="/tools/lag-report-validation.html" class="font-semibold text-blue-600 hover:underline">View Dashboard →</a>
             </div>
 
-            <div class="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300" data-tool-identifier="ticket-tracker">
+            <div class="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 hidden" data-tool-identifier="ticket-tracker">
                 <div class="flex items-center mb-4">
                     <i class="fas fa-ticket-alt text-3xl text-orange-500 mr-4"></i>
                     <h3 class="text-xl font-semibold text-gray-800">Universal Ticket Tracker</h3>
