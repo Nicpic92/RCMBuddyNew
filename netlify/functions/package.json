@@ -1,7 +1,7 @@
 {
   "name": "rcmbuddy-functions",
-  "version": "1.0.0",
-  "description": "Netlify functions for RCMBuddy",
+  "version": "1.0.1",
+  "description": "Netlify functions for RCMBuddy (updated deployment test)",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
