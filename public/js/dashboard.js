@@ -1,22 +1,18 @@
 // public/js/dashboard.js
 
-// This function will be called after a successful user verification (from auth.js)
 async function initDashboard(user) {
     console.log("Dashboard Initialization: Starting for user:", user);
 
-    // Update profile link/name display
     const profileLink = document.getElementById('profileLink');
     if (profileLink) {
         profileLink.textContent = `Hello, ${user.username || 'User'}!`;
     }
 
-    // Update company display
     const companyDisplay = document.getElementById('company-display');
     if (companyDisplay && user.company_name) {
         companyDisplay.textContent = `Company: ${user.company_name}`;
     }
 
-    // Setup Logout Button
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', handleLogout);
@@ -25,7 +21,6 @@ async function initDashboard(user) {
         console.warn("Dashboard Initialization: Logout button not found (ID: logoutBtn).");
     }
 
-    // Fetch and display authorized tools
     if (user.companyId) {
         console.log("Dashboard Initialization: Attempting to display authorized tools for companyId:", user.companyId);
         await displayAuthorizedTools(user.companyId);
@@ -36,10 +31,6 @@ async function initDashboard(user) {
     console.log("Dashboard Initialization: Completed.");
 }
 
-/**
- * Fetches authorized tools from the backend and displays them on the dashboard.
- * @param {string} companyId - The ID of the company to fetch tools for.
- */
 async function displayAuthorizedTools(companyId) {
     const toolCards = document.querySelectorAll('.tool-card[data-tool-identifier]');
     console.log("Display Tools: Starting. Found", toolCards.length, "initial tool cards.");
@@ -49,7 +40,7 @@ async function displayAuthorizedTools(companyId) {
         if (!token) {
             console.error("Display Tools: No authentication token found. Redirecting to login.");
             alert("Session expired or no token. Please log in again.");
-            window.location.href = '/index.html'; // Redirect to index/login
+            window.location.href = '/index.html';
             return;
         }
 
@@ -58,7 +49,7 @@ async function displayAuthorizedTools(companyId) {
              method: 'GET',
              headers: {
                  'Content-Type': 'application/json',
-                 'Authorization': `Bearer ${token}` // Ensure token is passed
+                 'Authorization': `Bearer ${token}`
              }
         });
 
@@ -82,11 +73,11 @@ async function displayAuthorizedTools(companyId) {
         toolCards.forEach(card => {
             const toolIdentifier = card.getAttribute('data-tool-identifier');
             if (authorizedTools.includes(toolIdentifier)) {
-                card.classList.remove('hidden'); // Show the tool card
+                card.classList.remove('hidden');
                 toolsDisplayedCount++;
                 console.log(`Display Tools: Showing tool: ${toolIdentifier}`);
             } else {
-                card.classList.add('hidden'); // Ensure it's hidden if not authorized
+                card.classList.add('hidden');
                 console.log(`Display Tools: Hiding tool: ${toolIdentifier}`);
             }
         });
@@ -99,12 +90,9 @@ async function displayAuthorizedTools(companyId) {
     }
 }
 
-/**
- * Handles user logout: clears token and redirects to the landing page.
- */
 function handleLogout() {
     console.log("Logout: Initiated.");
-    localStorage.removeItem('token'); // Remove the JWT token
+    localStorage.removeItem('token');
     console.log("Logout: Token removed. Redirecting to /index.html");
-    window.location.href = '/index.html'; // Redirect to your main landing/login page
+    window.location.href = '/index.html';
 }
