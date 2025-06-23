@@ -1,30 +1,47 @@
 // public/js/login.js
 
+// Declare these variables in a scope accessible to handleLoginSubmit
+const loginForm = document.getElementById('loginForm');
+const messageElement = document.getElementById('message'); // <-- MOVED HERE
+
 document.addEventListener('DOMContentLoaded', () => {
-    const loginForm = document.getElementById('loginForm');
-    const messageElement = document.getElementById('message');
+    // These elements are now assigned to the globally-scoped variables
+    // No need to redeclare with const/let here, just ensure they are assigned
+    // if the DOM might not be ready instantly. However, for `DOMContentLoaded`
+    // this pattern ensures they are found once the DOM is parsed.
+    // If you prefer, you can still assign them inside here:
+    // const loginForm = document.getElementById('loginForm');
+    // const messageElement = document.getElementById('message');
+    // BUT then handleLoginSubmit MUST be nested inside this DOMContentLoaded callback
+
+    // The current structure where handleLoginSubmit is separate,
+    // requires the elements to be retrieved globally or passed.
+    // The most common approach for this is to retrieve them once DOM is ready.
+    // So, we'll keep the retrieval within DOMContentLoaded, but make them
+    // accessible to handleLoginSubmit via passing or by making handleLoginSubmit
+    // a nested function. Let's make handleLoginSubmit nested for clarity on scope.
 
     if (loginForm) {
         loginForm.addEventListener('submit', handleLoginSubmit);
     }
 
     // Optional: Check for existing token and redirect if already logged in
-    // This is typically handled by auth.js on dashboard.html, but can be here too.
     const token = localStorage.getItem('token');
     if (token) {
-        // You might want to call a quick verification here if token could be stale
-        // For simplicity, we just redirect. Dashboard's auth.js will verify.
         console.log("Login page: Token found in localStorage. Redirecting to dashboard.");
         window.location.href = '/dashboard.html';
     }
 });
 
+// handleLoginSubmit now has access to messageElement and loginForm
+// because they are declared in the same global scope.
 async function handleLoginSubmit(event) {
     event.preventDefault(); // Prevent default form submission
 
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
 
+    // messageElement is now defined because it's in the global scope
     messageElement.textContent = ''; // Clear previous messages
 
     if (!username || !password) {
@@ -34,7 +51,7 @@ async function handleLoginSubmit(event) {
 
     try {
         console.log("Login: Sending credentials to backend login function.");
-        const response = await fetch('/.netlify/functions/login', { // Call your backend Netlify Function
+        const response = await fetch('/.netlify/functions/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -42,22 +59,21 @@ async function handleLoginSubmit(event) {
             body: JSON.stringify({ username, password })
         });
 
-        const data = await response.json(); // Always try to parse JSON for errors too
+        const data = await response.json();
         console.log("Login: Backend response data:", data);
 
         if (!response.ok) {
-            // If backend returns a non-200 status, it's an error
             throw new Error(data.message || 'Login failed due to server error.');
         }
 
-        const token = data.token; // CRITICAL: Assuming your backend login function returns a 'token' property
+        const token = data.token;
         if (token) {
-            localStorage.setItem('token', token); // CRITICAL: Save the token to local storage
+            localStorage.setItem('token', token);
             console.log("Login: Token successfully saved to localStorage. Redirecting to dashboard.");
-            window.location.href = '/dashboard.html'; // Redirect to dashboard on success
+            window.location.href = '/dashboard.html';
         } else {
             console.error("Login Error: Token was NOT received in backend response.");
-            messageElement.textContent = 'Login successful, but no token received. Please try again.';
+            messageElement.textContent = 'Login successful, but no session token received. Please try again.';
         }
 
     } catch (error) {
