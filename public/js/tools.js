@@ -1,75 +1,116 @@
 // public/js/tools.js
 
-const API_BASE = '/.netlify/functions'; // Or '/api' if you use the redirect
-
-// This function will be called from the <body> onload after verifyAndSetupUser has run
+/**
+ * Initializes the tools page after user authentication.
+ * @param {Object} user - The authenticated user object.
+ */
 async function initToolsPage(user) {
-    // These elements are in tools.html itself
-    const navList = document.getElementById('nav-list');
-    
-    // Check if user object is available (passed from verifyAndSetupUser)
-    if (!user) {
-        // Fallback if user is null/undefined, auth.js should ideally handle redirect
-        console.error("User data not available for initToolsPage. Redirecting.");
-        window.location.href = '/index.html';
-        return;
+    console.log("Tools Page Initialization: Starting for user:", user);
+
+    // Update profile link/name in the navbar
+    const profileLink = document.getElementById('profileLink');
+    if (profileLink) {
+        profileLink.textContent = `Hello, ${user.username || 'User'}!`;
+        console.log("Tools Page: Profile link updated to:", profileLink.textContent);
+    } else {
+        console.warn("Tools Page: Profile link element (ID: profileLink) not found in navbar.");
     }
 
-    // Dynamically add the "Admin Console" link if the user is an admin or superadmin
-    // (This duplicates logic from dashboard.js, but keeps page-specific JS separate)
-    if (user.role === 'admin' || user.role === 'superadmin') {
-        const adminLinkLi = document.createElement('li');
-        adminLinkLi.innerHTML = `<a href="/admin.html" class="text-blue-600 font-bold hover:underline">Admin Console</a>`;
-        
-        // Insert the admin link before the profile/logout elements
-        const profileLinkLi = document.getElementById('profileLink').closest('li');
-        if (profileLinkLi) {
-            navList.insertBefore(adminLinkLi, profileLinkLi);
-        } else {
-            navList.appendChild(adminLinkLi);
-        }
+    // Setup Logout Button (similar to dashboard.js if it's on this page too)
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', handleLogout);
+        console.log("Tools Page: Logout button event listener attached.");
+    } else {
+        console.warn("Tools Page: Logout button not found (ID: logoutBtn).");
     }
 
-    // --- Enforce Permissions: Show/Hide Tool Cards ---
-    // Fetch accessible tools from the backend (same call as dashboard)
+    // Call function to fetch and display accessible tools
+    if (user.companyId) {
+        console.log("Tools Page: Attempting to display accessible tools for companyId:", user.companyId);
+        await displayAccessibleTools(user.companyId);
+    } else {
+        console.warn("Tools Page: User has no companyId. Cannot fetch accessible tools.");
+        // Fallback: show all tools if permissions can't be fetched
+        document.querySelectorAll('.tool-card[data-tool-identifier]').forEach(card => card.classList.remove('hidden'));
+    }
+
+    console.log("Tools Page Initialization: Completed.");
+}
+
+/**
+ * Handles user logout: clears token and redirects to the landing page.
+ * Defined here for tools.js, as well as in dashboard.js. Could be moved to auth.js globally.
+ */
+function handleLogout() {
+    console.log("Logout: Initiated from Tools Page.");
+    localStorage.removeItem('token');
+    console.log("Logout: Token removed. Redirecting to /index.html");
+    window.location.href = '/index.html';
+}
+
+/**
+ * Fetches accessible tools from the backend and displays them on the /tools.html page.
+ * @param {string} companyId - The company ID to fetch tools for.
+ */
+async function displayAccessibleTools(companyId) {
+    const toolCards = document.querySelectorAll('.tool-card[data-tool-identifier]');
+    console.log("Display Accessible Tools: Starting. Found", toolCards.length, "initial tool cards.");
+
     try {
-        const token = localStorage.getItem('jwtToken');
-        if (!token) throw new Error('JWT token missing for tool access check.');
-
-        const response = await fetch(`${API_BASE}/get-accessible-tools`, { // Updated API path
-            method: 'GET',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Failed to fetch accessible tools for tools page:', response.status, errorData.message);
-            // If fetch fails, default to showing all cards, or show an error message
-            alert('Failed to load your tool access permissions. Displaying all tools.');
-            const allToolCards = document.querySelectorAll('[data-tool-identifier]');
-            allToolCards.forEach(card => card.style.display = 'block');
+        const token = localStorage.getItem('token');
+        if (!token) {
+            console.error("Display Accessible Tools: No authentication token found. Redirecting to login.");
+            alert("Session expired or no token. Please log in again.");
+            window.location.href = '/index.html';
             return;
         }
 
-        const data = await response.json();
-        const accessibleToolIdentifiers = data.tools || []; // Expecting an array of identifiers
-
-        const allToolCards = document.querySelectorAll('[data-tool-identifier]');
-
-        allToolCards.forEach(card => {
-            const toolIdentifier = card.dataset.toolIdentifier;
-            if (accessibleToolIdentifiers.includes(toolIdentifier)) {
-                card.style.display = 'block'; // Show the card if tool is accessible
-            } else {
-                card.style.display = 'none'; // Hide the card if not accessible
-            }
+        // CORRECTED URL: Make sure this matches your Netlify Function's actual path
+        // If your function is at netlify/functions/get-accessible-tools.js
+        console.log("Display Accessible Tools: Fetching from API: /.netlify/functions/get-accessible-tools");
+        const response = await fetch(`/.netlify/functions/get-accessible-tools?companyId=${companyId}`, { // Pass companyId as query param
+             method: 'GET',
+             headers: {
+                 'Content-Type': 'application/json',
+                 'Authorization': `Bearer ${token}`
+             }
         });
 
+        console.log("Display Accessible Tools: API Response Status:", response.status);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Display Accessible Tools: API HTTP Error:", response.status, errorText);
+            throw new Error(`HTTP error! Status: ${response.status} - ${errorText}`);
+        }
+
+        const accessibleTools = await response.json();
+        console.log("Display Accessible Tools: Accessible tools received from API:", accessibleTools);
+
+        if (!Array.isArray(accessibleTools)) {
+            console.error("Display Accessible Tools: API response is not an array:", accessibleTools);
+            throw new Error("Invalid format for accessible tools from API. Expected an array.");
+        }
+
+        let toolsDisplayedCount = 0;
+        toolCards.forEach(card => {
+            const toolIdentifier = card.getAttribute('data-tool-identifier');
+            if (accessibleTools.includes(toolIdentifier)) {
+                card.classList.remove('hidden');
+                toolsDisplayedCount++;
+                console.log(`Display Accessible Tools: Showing tool: ${toolIdentifier}`);
+            } else {
+                card.classList.add('hidden');
+                console.log(`Display Accessible Tools: Hiding tool: ${toolIdentifier}`);
+            }
+        });
+        console.log(`Display Accessible Tools: Finished displaying tools. Total shown: ${toolsDisplayedCount}`);
+
     } catch (error) {
-        console.error('Error in initToolsPage while checking tool permissions:', error);
-        // Fallback: If any error, show all tool cards by default
-        alert('An error occurred loading tool permissions. Displaying all tools.');
-        const allToolCards = document.querySelectorAll('[data-tool-identifier]');
-        allToolCards.forEach(card => card.style.display = 'block');
+        console.error("Display Accessible Tools: Error fetching or displaying tools:", error);
+        alert("An error occurred loading tool permissions. Displaying all tools (fallback).");
+        // Fallback: If there's an error, just show all.
+        toolCards.forEach(card => card.classList.remove('hidden'));
     }
 }
