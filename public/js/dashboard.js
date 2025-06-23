@@ -1,4 +1,4 @@
-// js/dashboard.js
+// public/js/dashboard.js
 
 // This function will be called after a successful user verification
 async function initDashboard(user) {
@@ -87,7 +87,7 @@ async function displayAuthorizedTools(companyId) {
         console.error("Error fetching or displaying authorized tools:", error);
         // Hide all tools in case of an error to avoid showing unauthorized content
         toolCards.forEach(card => card.classList.add('hidden'));
-        alert("Failed to load tools. Please check console for details.");
+        alert("Failed to load tools. Please check console for details."); // This is the alert you're seeing
     }
 }
 
