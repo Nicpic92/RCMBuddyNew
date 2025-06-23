@@ -18,7 +18,7 @@ exports.handler = async function(event) {
         return { statusCode: 405, body: JSON.stringify({ message: 'Method Not Allowed' }) };
     }
 
-    console.log("Backend Login Function: Raw event.body:", event.body); // CRITICAL: Log raw body
+    console.log("Backend Login Function: Raw event.body:", event.body);
 
     let parsedBody;
     try {
@@ -31,11 +31,11 @@ exports.handler = async function(event) {
 
     const { username, password } = parsedBody;
     console.log("Backend Login Function: Parsed username:", username);
-    console.log("Backend Login Function: Parsed password status:", password ? 'Present' : 'Missing'); // Don't log actual password
+    console.log("Backend Login Function: Parsed password status:", password ? 'Present' : 'Missing');
 
     if (!username || !password) {
         console.warn("Backend Login Function: Missing username or password after parsing.");
-        return { statusCode: 400, body: JSON.stringify({ message: 'Username and password are required.' }) }; // Changed message
+        return { statusCode: 400, body: JSON.stringify({ message: 'Username and password are required.' }) };
     }
 
     if (!JWT_SECRET) {
@@ -100,7 +100,7 @@ exports.handler = async function(event) {
 
     } catch (error) {
         console.error('Backend Login Function: FATAL ERROR:', error);
-        return { statusCode: 500, body: JSON.stringify({ message: 'An internal server error occurred during login.', error: error.message }) };
+        return { statusCode: 500, body: JSON.stringify({ message: 'An internal server error occurred.', error: error.message }) };
     } finally {
         if (client) {
             client.release();
