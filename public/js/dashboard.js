@@ -1,5 +1,3 @@
-// public/js/dashboard.js
-
 async function initDashboard(user) {
     console.log("Dashboard Initialization: Starting for user:", user);
 
