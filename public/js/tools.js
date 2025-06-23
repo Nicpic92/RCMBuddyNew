@@ -36,7 +36,7 @@ async function initToolsPage(user) {
         const token = localStorage.getItem('jwtToken');
         if (!token) throw new Error('JWT token missing for tool access check.');
 
-        const response = await fetch(`${API_BASE}/user-auth/get-accessible-tools`, { // Updated API path
+        const response = await fetch(`${API_BASE}/get-accessible-tools`, { // Updated API path
             method: 'GET',
             headers: { 'Authorization': `Bearer ${token}` }
         });
