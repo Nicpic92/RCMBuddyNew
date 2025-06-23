@@ -31,7 +31,6 @@ async function initDashboard(user) {
         await displayAuthorizedTools(user.companyId);
     } else {
         console.warn("Dashboard Initialization: User has no companyId. Cannot fetch authorized tools.");
-        // Hide all tools if companyId is missing or invalid
         document.querySelectorAll('.tool-card[data-tool-identifier]').forEach(card => card.classList.add('hidden'));
     }
     console.log("Dashboard Initialization: Completed.");
@@ -95,7 +94,6 @@ async function displayAuthorizedTools(companyId) {
 
     } catch (error) {
         console.error("Display Tools: Error fetching or displaying authorized tools:", error);
-        // Hide all tools in case of an error to avoid showing unauthorized content
         toolCards.forEach(card => card.classList.add('hidden'));
         alert("Failed to load tools. Please check console for details.");
     }
@@ -107,11 +105,6 @@ async function displayAuthorizedTools(companyId) {
 function handleLogout() {
     console.log("Logout: Initiated.");
     localStorage.removeItem('token'); // Remove the JWT token
-    // Clear any other user-related local storage items if applicable
     console.log("Logout: Token removed. Redirecting to /index.html");
     window.location.href = '/index.html'; // Redirect to your main landing/login page
 }
-
-// Note: The verifyAndSetupUser function is assumed to be defined and made globally accessible
-// by auth.js. It should handle initial authentication check and redirection if no token.
-// Example in auth.js: window.verifyAndSetupUser = verifyAndSetupUser;
