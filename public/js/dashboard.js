@@ -20,17 +20,28 @@ async function initDashboard(user) {
     // Setup Logout Button
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
-        logoutBtn.addEventListener('click', handleLogout);
+        logoutBtn.addEventListener('click', handleLogout); // This now correctly calls handleLogout
     }
 
     // Fetch and display authorized tools
-    await displayAuthorizedTools(user.company_id); // Assuming user object contains company_id
+    // Make sure user.company_id actually contains a value here (check console log above)
+    if (user.companyId) {
+        await displayAuthorizedTools(user.companyId);
+    } else {
+        console.warn("User has no companyId. Cannot fetch authorized tools.");
+        // Optionally hide all tools if companyId is missing
+        document.querySelectorAll('.tool-card[data-tool-identifier]').forEach(card => card.classList.add('hidden'));
+    }
 }
 
 async function displayAuthorizedTools(companyId) {
     const toolCards = document.querySelectorAll('.tool-card[data-tool-identifier]');
+    console.log("Starting displayAuthorizedTools for companyId:", companyId);
+    console.log("Initial tool cards found:", toolCards.length);
 
     try {
+        const token = localStorage.getItem('token'); // Ensure token is retrieved from localStorage
+
         // --- IMPORTANT: Replace this with your actual API endpoint for tools ---
         // This endpoint should return an array of strings, e.g., ['file-manager', 'data-cleaner']
         const response = await fetch(`/api/get-company-tools?companyId=${companyId}`, {
@@ -38,70 +49,56 @@ async function displayAuthorizedTools(companyId) {
              headers: {
                  'Content-Type': 'application/json',
                  // Include authorization token if your API requires it
-                 'Authorization': `Bearer ${localStorage.getItem('token')}`
+                 'Authorization': `Bearer ${token}` // Make sure this is correctly passed
              }
         });
 
+        console.log("API Response Status:", response.status);
+
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorText = await response.text(); // Get more detailed error message
+            console.error("API Error Response Text:", errorText);
+            throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
         }
 
-        const authorizedTools = await response.json(); // Expects an array of tool identifiers
+        const authorizedTools = await response.json();
+        console.log("Authorized tools received from API:", authorizedTools); // Crucial log
 
-        console.log("Authorized tools:", authorizedTools);
+        if (!Array.isArray(authorizedTools)) {
+            console.error("API response is not an array:", authorizedTools);
+            throw new Error("Invalid format for authorized tools from API. Expected an array.");
+        }
 
+        let toolsDisplayedCount = 0;
         toolCards.forEach(card => {
             const toolIdentifier = card.getAttribute('data-tool-identifier');
             if (authorizedTools.includes(toolIdentifier)) {
                 card.classList.remove('hidden'); // Show the tool card
+                toolsDisplayedCount++;
+                console.log(`Showing tool: ${toolIdentifier}`);
             } else {
-                card.classList.add('hidden'); // Ensure it's hidden if not authorized (redundant if all start hidden)
+                card.classList.add('hidden'); // Ensure it's hidden if not authorized
+                console.log(`Hiding tool: ${toolIdentifier}`);
             }
         });
+        console.log(`Finished displaying tools. Total shown: ${toolsDisplayedCount}`);
 
     } catch (error) {
-        console.error("Error fetching authorized tools:", error);
-        // Optionally, display an error message to the user
-        // alert("Failed to load tools. Please try again later.");
-        // As a fallback, you might hide all tools or show a generic message
+        console.error("Error fetching or displaying authorized tools:", error);
+        // Hide all tools in case of an error to avoid showing unauthorized content
         toolCards.forEach(card => card.classList.add('hidden'));
+        alert("Failed to load tools. Please check console for details.");
     }
 }
 
-// Assuming auth.js provides verifyAndSetupUser and handleLogout
-// If not, you'll need to define verifyAndSetupUser and handleLogout here
-/*
-async function verifyAndSetupUser() {
-    // Implement your token verification and user data fetching here
-    // Example (replace with your actual auth logic):
-    const token = localStorage.getItem('token');
-    if (!token) {
-        window.location.href = '/login.html'; // Redirect to login if no token
-        return null;
-    }
-    try {
-        const response = await fetch('/.netlify/functions/verify-token', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        if (!response.ok) {
-            throw new Error('Token verification failed');
-        }
-        const userData = await response.json();
-        return userData.user; // Assuming your verify-token function returns { user: { id, username, company_name, company_id, ... }}
-    } catch (error) {
-        console.error("Authentication failed:", error);
-        localStorage.removeItem('token');
-        window.location.href = '/login.html';
-        return null;
-    }
-}
-
+// --- DEFINE handleLogout HERE to fix ReferenceError ---
 function handleLogout() {
-    localStorage.removeItem('token');
-    window.location.href = '/login.html';
+    console.log("Logging out...");
+    localStorage.removeItem('token'); // Remove the JWT token
+    // You might also want to clear any other user-related local storage items
+    window.location.href = '/login.html'; // Redirect to your login page
 }
-*/
+
+// Note: The verifyAndSetupUser function is assumed to be in auth.js.
+// It should be made globally accessible by auth.js (e.g., window.verifyAndSetupUser = verifyAndSetupUser;)
+// or your build process should handle module imports correctly.
