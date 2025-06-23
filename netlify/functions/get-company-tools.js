@@ -30,6 +30,7 @@ exports.handler = async (event) => {
         client.release();
 
         const authorizedTools = result.rows.map(row => row.identifier);
+        console.log("Database query result for companyId", companyId, ":", authorizedTools);
         return {
             statusCode: 200,
             body: JSON.stringify(authorizedTools)
