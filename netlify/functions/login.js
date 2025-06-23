@@ -1,111 +1,110 @@
 // netlify/functions/login.js
 
-// OLD: const { Client } = require('pg');
-// OLD: const bcrypt = require('bcryptjs');
-// OLD: const jwt = require('jsonwebtoken');
-
-// NEW: Import centralized utility functions
 const { createDbClient } = require('./db');
-const bcrypt = require('bcryptjs'); // bcryptjs is used directly here
-const jwt = require('jsonwebtoken'); // jsonwebtoken is used directly here
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 
 exports.handler = async function(event) {
-    // We only accept POST requests for logging in
+    console.log("Backend Login Function: Request received.");
+    console.log("Backend Login Function: HTTP Method:", event.httpMethod);
+
     if (event.httpMethod !== 'POST') {
-        return {
-            statusCode: 405, // Method Not Allowed
-            body: JSON.stringify({ message: 'Only POST requests are allowed.' })
-        };
+        console.warn('Backend Login Function: Method Not Allowed. Expected POST.');
+        return { statusCode: 405, body: JSON.stringify({ message: 'Method Not Allowed' }) };
     }
 
-    const { identifier, password } = JSON.parse(event.body);
+    console.log("Backend Login Function: Raw event.body:", event.body); // CRITICAL: Log raw body
 
-    // Basic validation to ensure we received the necessary data
-    if (!identifier || !password) {
-        return {
-            statusCode: 400, // Bad Request
-            body: JSON.stringify({ message: 'Username/email and password are required.' })
-        };
-    }
-
-    let client; // Declare client outside try block for finally access
-
+    let parsedBody;
     try {
-        // NEW: Connect to the database using the centralized utility
+        parsedBody = JSON.parse(event.body);
+        console.log("Backend Login Function: Successfully parsed event.body.");
+    } catch (e) {
+        console.error("Backend Login Function: ERROR parsing JSON body:", e.message, "Raw body was:", event.body);
+        return { statusCode: 400, body: JSON.stringify({ message: 'Invalid JSON body. Check request format.' }) };
+    }
+
+    const { username, password } = parsedBody;
+    console.log("Backend Login Function: Parsed username:", username);
+    console.log("Backend Login Function: Parsed password status:", password ? 'Present' : 'Missing'); // Don't log actual password
+
+    if (!username || !password) {
+        console.warn("Backend Login Function: Missing username or password after parsing.");
+        return { statusCode: 400, body: JSON.stringify({ message: 'Username and password are required.' }) }; // Changed message
+    }
+
+    if (!JWT_SECRET) {
+        console.error('Backend Login Function: JWT_SECRET environment variable is NOT set!');
+        return { statusCode: 500, body: JSON.stringify({ message: 'Server configuration error: JWT secret missing.' }) };
+    }
+
+    let client;
+    try {
         client = await createDbClient();
-
-        // The query now selects all the necessary fields, including the new role and company_id
-        const query = `
-            SELECT id, username, email, role, company_id, password_hash
-            FROM users
-            WHERE username = $1 OR email = $1
-        `;
-        const result = await client.query(query, [identifier]);
-
-        const user = result.rows[0];
+        console.log("Backend Login Function: Database client obtained.");
         
+        const userQuery = `
+            SELECT u.id, u.username, u.email, u.password_hash, u.role, u.company_id, c.name as company_name
+            FROM users u
+            JOIN companies c ON u.company_id = c.id
+            WHERE u.username = $1;
+        `;
+        console.log("Backend Login Function: Querying user for username:", username);
+        const userResult = await client.query(userQuery, [username]);
+        console.log("Backend Login Function: User query rows returned:", userResult.rows.length);
 
-        // STEP 1: Check if a user with that username/email even exists.
-        // If not, we return a generic "Invalid credentials" error to avoid revealing
-        // whether a username is valid or not (a security best practice).
-        if (!user) {
-            return {
-                statusCode: 401, // Unauthorized
-                body: JSON.stringify({ message: 'Invalid credentials.' })
-            };
+        if (userResult.rows.length === 0) {
+            console.warn("Backend Login Function: User not found for username:", username);
+            return { statusCode: 401, body: JSON.stringify({ message: 'Invalid credentials.' }) };
         }
 
-        // STEP 2: Compare the password from the form with the hashed password in the database.
-        // bcrypt.compare will securely handle this check.
-        const passwordMatch = await bcrypt.compare(password, user.password_hash);
+        const user = userResult.rows[0];
+        console.log("Backend Login Function: User found. Comparing passwords.");
 
-        if (!passwordMatch) {
-            return {
-                statusCode: 401, // Unauthorized
-                body: JSON.stringify({ message: 'Invalid credentials.' })
-            };
+        const isMatch = await bcrypt.compare(password, user.password_hash);
+        if (!isMatch) {
+            console.warn("Backend Login Function: Password mismatch for user:", username);
+            return { statusCode: 401, body: JSON.stringify({ message: 'Invalid credentials.' }) };
         }
 
-        // STEP 3: Authentication successful! Create a JSON Web Token (JWT).
-        // The payload of the token contains the user's essential, non-sensitive data.
-        // This payload can be read by the frontend to customize the UI.
-        const token = jwt.sign(
-            {
-                userId: user.id,
-                username: user.username,
-                role: user.role, // Crucial for frontend UI (e.g., show 'Admin Panel' button)
-                companyId: user.company_id // Crucial for admin API calls (e.g., 'get all users from *my* company')
-            },
-            process.env.JWT_SECRET, // The secret key stored in Netlify environment variables
-            { expiresIn: '1d' } // Define how long the token is valid for (e.g., 1 day)
-        );
+        const payload = {
+            userId: user.id,
+            username: user.username,
+            role: user.role,
+            companyId: user.company_id,
+            company_name: user.company_name
+        };
+        const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        console.log("Backend Login Function: JWT token generated successfully.");
 
-        // Return a success response with the new token
         return {
             statusCode: 200,
             body: JSON.stringify({
                 message: 'Login successful!',
                 token: token,
-                user: { // Also return user data for immediate frontend use (prevents extra API call)
+                user: {
                     id: user.id,
                     username: user.username,
                     email: user.email,
                     role: user.role,
-                    companyId: user.company_id
+                    companyId: user.company_id,
+                    company_name: user.company_name
                 }
             }),
         };
 
     } catch (error) {
-        console.error('Login error:', error);
-        return {
-            statusCode: 500, // Internal Server Error
-            body: JSON.stringify({ message: 'An unexpected error occurred during login.' })
-        };
+        console.error('Backend Login Function: FATAL ERROR:', error);
+        return { statusCode: 500, body: JSON.stringify({ message: 'An internal server error occurred during login.', error: error.message }) };
     } finally {
-        // Ensure the database connection is closed
         if (client) {
-            client.end(); // Use client.end() for direct client connections
+            client.release();
+            console.log("Backend Login Function: Database client released.");
         }
     }
 };
