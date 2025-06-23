@@ -2,112 +2,127 @@
 
 const { Pool } = require('pg'); // Ensure 'pg' is in your package.json dependencies
 
-// Initialize the database pool (similar to your db.js)
-// This will get the DATABASE_URL from Netlify environment variables
+// Initialize the database pool only once per function instance (cold start)
 let pool;
 function getDbPool() {
     if (!pool) {
         const connectionString = process.env.DATABASE_URL;
-        console.log("Attempting to get DB pool..."); // Log when trying to initialize pool
+        console.log("Function Startup (get-company-tools): Attempting to initialize DB pool.");
 
         if (!connectionString) {
-            console.error('ERROR: DATABASE_URL environment variable is NOT set for get-company-tools. Function will fail.');
-            throw new Error('Database connection string is missing.');
+            console.error('ERROR (get-company-tools): DATABASE_URL environment variable is NOT set. Database connection will fail.');
+            // Throwing an error here prevents the function from proceeding without credentials
+            throw new Error('Database connection string is missing from Netlify environment variables.');
         }
 
         pool = new Pool({
             connectionString: connectionString,
-            // Neon's connection string usually includes sslmode=require, handling SSL automatically.
-            // If you still encounter SSL errors, uncomment and use with caution for production.
+            // Neon's connection string often includes sslmode=require, handling SSL automatically.
+            // If you still encounter SSL errors (e.g., self-signed certificate errors in dev),
+            // you might need to uncomment and adjust the ssl option. Use with caution for production.
             /*
             ssl: {
-                rejectUnauthorized: false
+                rejectUnauthorized: false // WARNING: Disables certificate validation. Do not use in production without understanding risks.
             }
             */
         });
 
+        // Add an error listener for the pool itself to catch unhandled pool errors
         pool.on('error', (err, client) => {
-            console.error('DB Pool Error in get-company-tools:', err, 'Client:', client ? 'present' : 'null');
-            // In a serverless environment, errors on idle clients are less critical to crash for.
-            // Log them, but let the function finish if possible.
+            console.error('CRITICAL DB Pool Error (get-company-tools): Unexpected error on idle client or during acquisition.', err);
+            // In serverless, it's generally best to log and let the invocation fail,
+            // rather than trying to gracefully recover a broken pool connection in a stateless environment.
         });
-        console.log("SUCCESS: PostgreSQL Pool initialized for get-company-tools.");
+        console.log("Function Startup (get-company-tools): PostgreSQL Pool initialized successfully.");
     }
     return pool;
 }
 
 
-exports.handler = async function(event, context) { // Added 'context' parameter though not used here
-    console.log("Function get-company-tools received a request.");
+exports.handler = async function(event, context) {
+    console.log("Function Invocation (get-company-tools): Request received.");
 
+    // Ensure it's a GET request
     if (event.httpMethod !== 'GET') {
-        console.warn(`WARN: Method Not Allowed. Received ${event.httpMethod} for get-company-tools.`);
-        return { statusCode: 405, body: 'Method Not Allowed' };
-    }
-
-    const companyId = event.queryStringParameters.companyId;
-    console.log("Received companyId:", companyId);
-
-    if (!companyId) {
-        console.error("ERROR: companyId is missing from query parameters.");
+        console.warn(`Function Invocation (get-company-tools): Method Not Allowed. Received ${event.httpMethod}.`);
         return {
-            statusCode: 400,
+            statusCode: 405,
             headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-            body: JSON.stringify({ message: 'companyId is required.' })
+            body: JSON.stringify({ message: 'Method Not Allowed. Only GET is supported.' })
         };
     }
 
-    let client; // Declare client outside try to ensure it's accessible in finally
-    try {
-        const dbPool = getDbPool(); // Get the shared pool
-        client = await dbPool.connect(); // Get a client from the pool
-        console.log("SUCCESS: Database client obtained from pool.");
+    // Extract companyId from query parameters
+    const companyId = event.queryStringParameters.companyId;
+    console.log(`Function Invocation (get-company-tools): Processing request for companyId: "${companyId}"`);
 
-        // Query to get tool identifiers for the given companyId
-        // This query joins company_tools with tools to get the 'identifier' string
-        // The 'identifier' column in 'tools' should match your HTML data-tool-identifier attributes
+    if (!companyId) {
+        console.error("Function Invocation (get-company-tools): ERROR: 'companyId' is missing from query parameters.");
+        return {
+            statusCode: 400,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            body: JSON.stringify({ message: 'companyId is required in query parameters.' })
+        };
+    }
+
+    let client; // Declare client outside try to ensure it's accessible in finally for release
+    try {
+        const dbPool = getDbPool(); // Get the shared pool instance
+        client = await dbPool.connect(); // Obtain a client from the pool
+        console.log("Function Invocation (get-company-tools): Successfully obtained DB client.");
+
+        // SQL Query to join company_tools and tools tables
+        // Assumes 'company_tools' has 'company_id' and 'tool_id'
+        // Assumes 'tools' has 'id' and 'identifier' (matching data-tool-identifier in HTML)
         const query = `
             SELECT t.identifier
             FROM company_tools ct
             JOIN tools t ON ct.tool_id = t.id
             WHERE ct.company_id = $1;
         `;
-        console.log("Executing DB query for companyId:", companyId);
+        console.log(`Function Invocation (get-company-tools): Executing SQL query for companyId: ${companyId}.`);
         const result = await client.query(query, [companyId]);
-        console.log("DB Query Result Rows:", result.rows.length);
+        console.log(`Function Invocation (get-company-tools): DB query returned ${result.rows.length} rows.`);
 
-        // Extract identifiers into an array
+        // Map the result rows to an array of tool identifiers (strings)
         const authorizedToolIdentifiers = result.rows.map(row => row.identifier);
 
-        console.log(`SUCCESS: Fetched authorized tools for company ${companyId}:`, authorizedToolIdentifiers);
+        console.log("Function Invocation (get-company-tools): Authorized tool identifiers:", authorizedToolIdentifiers);
 
+        // Return a successful response with the list of tool identifiers
         return {
             statusCode: 200,
             headers: {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*', // IMPORTANT: For production, narrow this to your actual frontend domain(s)
-                'Access-Control-Allow-Methods': 'GET, OPTIONS', // Only GET is strictly needed for this function
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization' // Allow Authorization header if you add token validation later
+                'Access-Control-Allow-Origin': '*', // IMPORTANT: In production, change '*' to your specific frontend domain (e.g., 'https://rcmbuddy.com')
+                'Access-Control-Allow-Methods': 'GET, OPTIONS', // Allow preflight OPTIONS requests from browser
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization' // Allow headers your frontend sends
             },
             body: JSON.stringify(authorizedToolIdentifiers)
         };
 
     } catch (error) {
-        console.error('FATAL ERROR in get-company-tools:', error); // More prominent error logging
+        console.error('Function Invocation (get-company-tools): FATAL ERROR during execution:', error);
+        // Return a 500 status code for internal server errors
         return {
-            statusCode: 500, // Now returning 500 for actual function errors
+            statusCode: 500,
             headers: {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'GET, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, Authorization'
             },
-            body: JSON.stringify({ message: 'Failed to fetch authorized tools due to server error.', error: error.message })
+            body: JSON.stringify({
+                message: 'Internal Server Error: Failed to fetch authorized tools.',
+                error: error.message, // Include error message for debugging
+                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // Optionally include stack in dev
+            })
         };
     } finally {
+        // Ensure the database client is released back to the pool
         if (client) {
-            client.release(); // Ensure client is released back to the pool
-            console.log("Database client released.");
+            client.release();
+            console.log("Function Invocation (get-company-tools): Database client released back to pool.");
         }
     }
 };
