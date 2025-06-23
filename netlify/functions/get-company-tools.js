@@ -36,11 +36,7 @@ exports.handler = async function(event, context) {
 
     if (event.httpMethod !== 'GET') {
         console.warn(`Function Invocation (get-company-tools): Method Not Allowed. Received ${event.httpMethod}.`);
-        return {
-            statusCode: 405,
-            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-            body: JSON.stringify({ message: 'Method Not Allowed. Only GET is supported.' })
-        };
+        return { statusCode: 405, body: JSON.stringify({ message: 'Method Not Allowed' }) };
     }
 
     const companyId = event.queryStringParameters.companyId;
@@ -48,11 +44,7 @@ exports.handler = async function(event, context) {
 
     if (!companyId) {
         console.error("Function Invocation (get-company-tools): ERROR: 'companyId' is missing from query parameters.");
-        return {
-            statusCode: 400,
-            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-            body: JSON.stringify({ message: 'companyId is required in query parameters.' })
-        };
+        return { statusCode: 400, body: JSON.stringify({ message: 'companyId is required in query parameters.' }) };
     }
 
     let client;
