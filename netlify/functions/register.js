@@ -1,9 +1,10 @@
-// netlify/functions/register.js (This is the assumed correct path based on your screenshot)
+// netlify/functions/register.js
 
-// NEW: Import centralized utility functions
-// CORRECTED PATH: Go up two levels (from user-auth to functions) then down into utils
-const { createDbClient } = require('./db'); 
-const bcrypt = require('bcryptjs'); // bcryptjs is used directly here
+// Assuming db.js is a sibling file or in a directly accessible path
+// If db.js is in 'utils' like netlify/functions/utils/db.js, you'd adjust this:
+// const { createDbClient } = require('./utils/db');
+const { createDbClient } = require('./db');
+const bcrypt = require('bcryptjs');
 
 exports.handler = async function(event) {
     if (event.httpMethod !== 'POST') {
@@ -19,10 +20,10 @@ exports.handler = async function(event) {
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
-    let client; 
+    let client;
 
     try {
-        client = await createDbClient();
+        client = await createDbClient(); // This will now get a client from the pool configured with Neon DB_URL
         await client.query('BEGIN');
 
         let companyResult = await client.query('SELECT id FROM companies WHERE name = $1', [company_name]);
@@ -59,24 +60,24 @@ exports.handler = async function(event) {
             }),
         };
     } catch (error) {
-        if (client) { 
+        if (client) {
             await client.query('ROLLBACK');
         }
 
-        if (error.code === '23505') { 
+        if (error.code === '23505') { // PostgreSQL unique violation error code
             return {
-                statusCode: 409, 
+                statusCode: 409,
                 body: JSON.stringify({ message: 'Username or email already exists.' }),
             };
         }
         console.log('Database error:', error);
         return {
-            statusCode: 500, 
-            body: JSON.stringify({ message: 'Could not register user. An unexpected error occurred.'+ error }),
+            statusCode: 500,
+            body: JSON.stringify({ message: 'Could not register user. An unexpected error occurred.'+ error.message }), // Use error.message for a cleaner output
         };
     } finally {
         if (client) {
-            client.end();
+            client.release(); // IMPORTANT: Release the client back to the pool
         }
     }
 };
